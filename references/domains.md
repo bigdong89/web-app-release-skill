@@ -163,6 +163,20 @@ per data store · breach-notification owner + 72-hour path · DPIA status.
 | Analytics present | Tag/snippet in rendered HTML or confirmed event in the tool |
 | Accessibility statement | Recommend for EU-facing products (EAA) |
 
+### Remediation: reference-policy research (only on user request; never legal advice)
+
+When CMP-001/003/004 fires, drafting belongs to a one-time project with
+counsel — the gate verifies presence/config only. On explicit request, help
+the fix with a **disclosure-coverage diff, never text reuse**: fetch 1–2
+reference policies the user names (a large vendor in the same space works
+well) and diff them against the CMP-003 disclosure list — which required
+items they carry that ours lacks. Two hard lines: (1) never copy wording —
+policy text is copyrighted, and a borrowed policy describes *their* vendors,
+retention and transfers; a policy that misstates this app's practices is
+itself a transparency violation (Arts. 12–14). The §8 questionnaire output is
+what the real policy must match. (2) no legal-risk judgement — record open
+questions as findings for the user to raise with counsel.
+
 Sources: GDPR (EUR-Lex 32016R0679) Arts. 3, 6–8, 12–14, 15–22, 25, 28, 30,
 32–35 · EDPB guidelines (edpb.europa.eu) · ICO GDPR checklist (ico.org.uk) ·
 CNIL cookies guidance — reviewed 2026-09. Presence/config checks only — confirm

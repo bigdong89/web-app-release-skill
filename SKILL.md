@@ -76,7 +76,7 @@ Rules during audit: strictly read-only against the target (no form submissions w
 
 ### Phase 3 — Remediate
 
-Fix P0/P1 items in the repo. After each fix, re-run the owning script subcommand (or the targeted browser check) and update that scorecard row. Claim only what a fresh command output shows — follow `superpowers:verification-before-completion`. Append before/after evidence to the report's remediation log.
+Fix P0/P1 items in the repo. After each fix, re-run the owning script subcommand (or the targeted browser check) and update that scorecard row. Claim only what a fresh command output shows — follow `superpowers:verification-before-completion`. Append before/after evidence to the report's remediation log. For CMP-001/003/004 fixes, reference-policy coverage comparison is available on explicit request (domains.md §8) — never copy policy text; legal-risk judgement stays with counsel.
 
 ### Phase 4 — Post-deploy verify (optional; only with a deployed URL)
 
