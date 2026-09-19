@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Fixture — This Is A Deliberately Overlong Page Title Meant To Trip The Length Check</title>
+<meta name="description" content="Too short.">
+<link rel="canonical" href="http://127.0.0.1:{port}/blog/post.html">
+<meta property="og:title" content="Fixture post">
+<meta property="og:description" content="A fixture post with partial OG tags.">
+<meta property="og:image" content="http://127.0.0.1:{port}/assets/og-small.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Broken }
+</script>
+</head>
+<body>
+<h1>Fixture Post</h1>
+<h1>Duplicate Heading</h1>
+<p>This post page carries a title that exceeds the recommended length, a description that is shorter than recommended, two H1 headings, and a syntactically broken JSON-LD block. The audit should flag all four problems with distinct finding identifiers so that remediation can target each one.</p>
+<p><a href="/">Back home</a></p>
+</body>
+</html>
