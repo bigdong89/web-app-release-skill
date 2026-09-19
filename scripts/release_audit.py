@@ -967,9 +967,14 @@ def _find_policy_link(page, base_url, tokens, substrings):
     return None
 
 
-def _probe_paths(base_url, paths, req_h, timeout):
-    """First common path that answers < 400; None when all fail."""
+def _probe_paths(base_url, paths, req_h, timeout, allowed=None, skipped=None):
+    """First common path that answers < 400; None when all fail. Paths the
+    robots predicate rejects are skipped and recorded for the summary."""
     for path in paths:
+        if allowed is not None and not allowed(path):
+            if skipped is not None:
+                skipped.append(path)
+            continue
         res = fetch(urljoin(base_url, path), req_h, timeout)
         if not res.error and res.status < 400:
             return res
@@ -1011,15 +1016,30 @@ def cmd_privacy(args):
                            "verify in a browser that they only fire after consent",
                            evidence=", ".join(sorted(found_hosts)),
                            fix="Gate these scripts behind the consent banner, or drop them."))
+    elif page.is_spa_shell():
+        out.append(finding("PRV-011", "review",
+                           "SPA shell: static HTML cannot rule out JS-injected trackers; "
+                           "verify rendered DOM in the browser layer"))
     else:
-        caveat = " (SPA shell: JS-injected tags are invisible here)" if page.is_spa_shell() else ""
-        out.append(finding("PRV-011", "pass",
-                           "No known third-party trackers in static HTML" + caveat))
+        out.append(finding("PRV-011", "pass", "No known third-party trackers in static HTML"))
+
+    # Robots.txt gates the probe paths (the UA string promises we respect it).
+    origin = urlsplit(base)
+    robots = None
+    robots_res = fetch(f"{origin.scheme}://{origin.netloc}/robots.txt", req_h, args.timeout)
+    if not robots_res.error and robots_res.status == 200 and robots_res.raw.strip():
+        robots_text, _ = decode_body(robots_res)
+        robots = parse_robots(robots_text or "")
+    skipped_probes = []
+
+    def probe_allowed(path):
+        return robots is None or robots_group_allowed(robots, path)
 
     # Privacy policy: discover via link scan, fall back to common-path probes.
     policy_link = _find_policy_link(page, base, PRIVACY_LINK_TOKENS, PRIVACY_LINK_SUBSTRINGS)
     policy_res = (fetch(policy_link, req_h, args.timeout) if policy_link
-                  else _probe_paths(base, PRIVACY_PATH_PROBES, req_h, args.timeout))
+                  else _probe_paths(base, PRIVACY_PATH_PROBES, req_h, args.timeout,
+                                    allowed=probe_allowed, skipped=skipped_probes))
     if policy_link is None and policy_res is None:
         out.append(finding("PRV-001", "warn", "No privacy policy link found on the page",
                            evidence=f"link-keyword scan + {len(PRIVACY_PATH_PROBES)} common-path probes empty",
@@ -1047,7 +1067,8 @@ def cmd_privacy(args):
     # Terms: same discovery, no keyword floor.
     terms_link = _find_policy_link(page, base, TERMS_LINK_TOKENS, TERMS_LINK_SUBSTRINGS)
     terms_res = (fetch(terms_link, req_h, args.timeout) if terms_link
-                 else _probe_paths(base, TERMS_PATH_PROBES, req_h, args.timeout))
+                 else _probe_paths(base, TERMS_PATH_PROBES, req_h, args.timeout,
+                                   allowed=probe_allowed, skipped=skipped_probes))
     if terms_link is None and terms_res is None:
         out.append(finding("PRV-002", "warn", "No terms link found on the page",
                            evidence=f"link-keyword scan + {len(TERMS_PATH_PROBES)} common-path probes empty",
@@ -1066,7 +1087,8 @@ def cmd_privacy(args):
     out.append(finding("PRV-SUM", "info",
                        f"Privacy scan: trackers={len(found_hosts)} host(s); "
                        f"policy={'found' if (policy_link or policy_res) else 'missing'}; "
-                       f"terms={'found' if (terms_link or terms_res) else 'missing'}"))
+                       f"terms={'found' if (terms_link or terms_res) else 'missing'}; "
+                       f"robots-skipped probes={len(skipped_probes)}"))
     return assemble(url, args.context, out, started)
 
 

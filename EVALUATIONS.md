@@ -78,6 +78,29 @@ CMP-001..010 checklist + processor questionnaire).
   domain table), integrations.md (consent-order wording), docs/research.md
   (§3 decision 7, §5 GDPR sources).
 
+## Run 4 — self-review fixes (v1.2 follow-up), 2026-09-20
+
+A comprehensive review of the repo surfaced 3 defects + 2 calibration gaps;
+all fixed in one pass:
+
+- PRV-011 reported `pass` on SPA shells where static HTML proves nothing —
+  now `review` (matches the meta subcommand's SPA discipline). New spa fixture
+  assertions also cover the broken-policy-link warn path.
+- `privacy` probes ignored robots.txt while the UA string claims otherwise —
+  probes now gate on robots; the skipped count lands in PRV-SUM.
+- SKILL.md description had no GDPR/privacy trigger words and a stale check
+  list — trigger surface extended, list synced; config example gained
+  `compliance.gdpr`; report template gained a `GDPR applicability` line under
+  the verdict.
+- Calibration: PRV-001/002 warns on site types where §8 is `—`/`L` are
+  courtesy info (report-guide downgrades), not P2 findings.
+- Cleanups: `run_lighthouse.sh` dead FAILED variable removed, JSON parse
+  guarded; finding template `{S|M:L}` → `{S|M|L}`.
+
+`tests/run_fixture_tests.py`: **89/89 assertions pass** (was 83/83).
+Deferred to a later version: PRV-020 form/signup heuristic (CMP-001 evidence
+hook), user-extensible tracker host list, probe-success fixture coverage.
+
 ## Known limitations (v1.2)
 
 - Single site per audit (no monorepo multi-app).

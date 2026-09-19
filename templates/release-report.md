@@ -5,6 +5,7 @@ Date: {YYYY-MM-DD} · Context: {production|preview} · Auditor: web-app-release-
 ## Verdict: {GO | NO-GO}
 
 Rule: GO iff zero P0 findings. {N} P0 found. P1 obligations: {list or "none"}.
+GDPR applicability: {applies | does not apply — {why} | not assessed}
 
 ## Scorecard
 
@@ -27,7 +28,7 @@ Rule: GO iff zero P0 findings. {N} P0 found. P1 obligations: {list or "none"}.
   - Evidence: {quoted command output / header / screenshot / path}
   - Impact: {one line}
   - Fix: {action}
-  - Effort: {S|M:L}
+  - Effort: {S|M|L}
 
 ## Not covered
 

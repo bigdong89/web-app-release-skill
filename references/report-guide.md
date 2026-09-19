@@ -23,10 +23,12 @@ Escalate to **P0**:
 - core-flow failure from functional QA · collecting personal data with no
   privacy policy (CMP-001)
 
-Downgrade to **warn/P2**:
+Downgrades:
 - host-limited platforms (see site-types.md host matrix)
 - environment-caused items under `preview` context (TLS, headers)
 - SEC-M-001 note: source maps are P1, even though sibling SEC-M IDs are P0
+- PRV-001/002 warns on site types where domain 8 is `—` or `L (if tracking)`
+  in the site-types matrix → courtesy info (P3), not a finding
 
 `severity_overrides` in `.release-check.yml` beats all of the above.
 

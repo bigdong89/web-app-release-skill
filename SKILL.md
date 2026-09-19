@@ -1,6 +1,6 @@
 ---
 name: web-app-release-skill
-description: Use when the user is about to launch, release, ship, or go live with a web app or website — pre-launch check, release audit, readiness review, go/no-go call, post-deploy verification, or asks "is my site ready to ship". Also triggers on 发布前检查 / 上线体检 / 发版前核查 / 上线前检查. Runs deterministic audits (security headers, SEO/GEO meta, sitemap/robots, dead links, leaked secrets, Lighthouse), coordinates judgment-only checks, and produces an evidence-backed scorecard with a GO/NO-GO verdict. Not for standalone SEO keyword tuning or pure code review.
+description: Use when the user is about to launch, release, ship, or go live with a web app or website — pre-launch check, release audit, readiness review, go/no-go call, post-deploy verification, or asks "is my site ready to ship". Also for single-domain asks like "check my GDPR / privacy / cookie compliance" or privacy-policy/terms presence checks (隐私合规 / 隐私政策检查 / 用户协议检查), and on 发布前检查 / 上线体检 / 发版前核查 / 上线前检查. Runs deterministic audits (security headers, SEO/GEO meta, sitemap/robots, dead links, leaked secrets, privacy/terms discovery + third-party tracker detection, Lighthouse), coordinates judgment-only checks, and produces an evidence-backed scorecard with a GO/NO-GO verdict. Not for standalone SEO keyword tuning, pure code review, or legal advice.
 ---
 
 # Web App Release Gate
@@ -32,6 +32,7 @@ login: { cookie: "session=...", note: "where to find staging creds" }
 locales: ["en", "de"]
 thresholds: { performance: 90, page_weight_kb: 1500 }
 severity_overrides: { CMP-001: P0 }
+compliance: { gdpr: yes, note: "EU-facing; de/en locales" }
 max_links_pages: 50
 report_dir: release-audit      # any path; an explicitly user-requested location wins
 ```
@@ -70,7 +71,7 @@ Rules during audit: strictly read-only against the target (no form submissions w
 ### Phase 2 — Verdict
 
 1. Map findings to severities using `references/report-guide.md` defaults; `.release-check.yml` `severity_overrides` wins.
-2. Fill `templates/release-report.md` → write `<repo>/release-audit/<date>-<host>.md` in the conversation's language. Scorecard: one row per domain (PASS/WARN/FAIL + finding counts). Every finding: id, severity, evidence, fix, effort estimate (S/M/L).
+2. Fill `templates/release-report.md` → write `<repo>/release-audit/<date>-<host>.md` in the conversation's language. Scorecard: one row per domain (PASS/WARN/FAIL + finding counts). Print `GDPR applicability: …` under the verdict from `.release-check.yml` `compliance.gdpr` (or the §8 triage result). Every finding: id, severity, evidence, fix, effort estimate (S/M/L).
 3. Verdict rule: **GO if and only if no P0 findings.** P1s are listed as "fix before or immediately after launch". State the rule in the report.
 4. Present the report; start Phase 3 only on the user's go-ahead (or if they pre-authorized fixes).
 

@@ -179,6 +179,15 @@ EXPECTED = [
         ("PRV-010", None),
         ("PRV-011", "pass"),           # no scripts at all; not an SPA shell
     ]),
+    ("privacy / spa shell: no static tracker evidence -> review; broken policy link -> warn",
+     ["privacy", "URL"], [
+        ("PRV-011", "review"),         # SPA shell: static HTML proves nothing
+        ("PRV-010", None),             # /app.js is same-origin
+        ("PRV-001", "pass"),           # footer link present
+        ("PRV-003", "warn"),           # links to a missing page
+        ("PRV-005", None),             # unreachable page -> no keyword floor
+        ("PRV-002", "warn"),           # no terms link; probes 404
+    ]),
 ]
 
 
@@ -202,7 +211,8 @@ def main():
                 "meta / post with long title, dup h1, broken JSON-LD, small og:image": url_post,
                 "meta / spa shell becomes review, not fail": url_spa,
                 "meta / noindex page": url_noindex,
-                "privacy / shop page links policy+terms and fires trackers": url_shop}
+                "privacy / shop page links policy+terms and fires trackers": url_shop,
+                "privacy / spa shell: no static tracker evidence -> review; broken policy link -> warn": url_spa}
 
     passed = failed = 0
     try:

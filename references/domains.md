@@ -113,8 +113,9 @@ Record one of: "GDPR applies" or "does not apply — because …". Signals:
 EU locales/hreflang, EUR pricing, `.eu` domain, EU-targeted marketing,
 analytics collecting EU visitors. Non-applicability: explicit EU/EEA
 geo-blocking or an internal-only tool. **An unstated default is the finding**
-(CMP-002). Adjacent regimes (UK GDPR, CCPA/CPRA): one awareness line, not a
-full pass.
+(CMP-002). Record the decision in `.release-check.yml` (`compliance.gdpr`) and
+echo it in the report under the verdict. Adjacent regimes (UK GDPR,
+CCPA/CPRA): one awareness line, not a full pass.
 
 ### Script layer — `release_audit.py privacy <url>` (homepage + one key route)
 
@@ -124,7 +125,10 @@ full pass.
 | PRV-003/004 | Discovered policy / terms page fetches 200 | 404/error → warn |
 | PRV-005 | Policy page contains a keyword floor (personal data, cookie(s), GDPR/DSGVO, privacy, 隐私 …) | floor only — content adequacy is CMP-003 |
 | PRV-010 | Known third-party trackers in static HTML (`KNOWN_TRACKER_HOSTS` in the script, compiled 2026-09) | `review` — resolve in the browser layer before assigning severity |
-| PRV-011 | No known trackers in static HTML (JS-injected tags are invisible; SPA caveat) | pass |
+| PRV-011 | No known trackers in static HTML (`review` on an SPA shell — static HTML proves nothing) | pass |
+
+Site-type weighting: where the matrix below gives §8 `—` or `L (if tracking)`,
+PRV-001/002 warns are courtesy info (see report-guide downgrades), not findings.
 
 ### Browser layer (evidence for CMP-005/006/007)
 

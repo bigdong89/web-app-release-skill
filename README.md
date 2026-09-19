@@ -68,7 +68,7 @@ warnings instead of false fails, and client-rendered SPA shells yield
 ## Testing
 
 Acceptance is fixture-driven: [`tests/`](tests/) serves a deliberately broken
-site and asserts every planted defect is detected — currently **83/83**.
+site and asserts every planted defect is detected — currently **89/89**.
 
 ```bash
 python3 tests/run_fixture_tests.py

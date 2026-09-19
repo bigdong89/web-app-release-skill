@@ -69,7 +69,8 @@ checklists · Octopus/Cortex/CloudBees production-readiness checklists.
    classic false P0s (localhost TLS, github.io headers).
 4. SPA shells produce `review` status, never silent fails — static HTML checks
    on client-rendered pages are the #1 false-negative trap.
-5. Fixture-driven acceptance (tests/run_fixture_tests.py, 68 assertions)
+5. Fixture-driven acceptance (tests/run_fixture_tests.py, 68 assertions at
+   v1.1; 83+ since the v1.2 privacy section)
    because "no false P0s on real sites" is unmeasurable without a known-broken
    sample.
 6. Triggers narrowed to release/launch scenarios so the gate doesn't hijack

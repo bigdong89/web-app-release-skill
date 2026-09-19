@@ -42,7 +42,6 @@ if [ -z "$CHROME" ]; then
 fi
 
 mkdir -p "$OUT_DIR"
-FAILED=0
 for url in "${URLS[@]}"; do
   slug=$(printf '%s' "$url" | sed -e 's|^[a-z]*://||' -e 's|[^A-Za-z0-9._-]|_|g' | cut -c1-80)
   slug=${slug%.*}   # lighthouse strips output-path extensions; keep names in sync
@@ -53,12 +52,15 @@ for url in "${URLS[@]}"; do
         --output json --output html \
         --output-path "$base" ; then
     echo "WARN: lighthouse run failed for $url (see $base); treat performance as manual."
-    FAILED=1
     continue
   fi
   python3 - "$base.report.json" <<'PY'
 import json, sys
-d = json.load(open(sys.argv[1]))
+try:
+    d = json.load(open(sys.argv[1]))
+except (OSError, ValueError) as e:
+    print(f"   WARN: could not parse {sys.argv[1]}: {e}")
+    sys.exit(0)
 for k in ("performance", "seo", "best-practices", "accessibility"):
     c = d.get("categories", {}).get(k)
     if c and c.get("score") is not None:
