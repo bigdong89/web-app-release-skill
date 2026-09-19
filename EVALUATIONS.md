@@ -54,10 +54,37 @@ Planned exit: two consecutive test rounds needing no SKILL.md changes.
 Run 2 produced changes (above) → **not yet met**. Next: re-run the walkthrough
 in fresh sessions; exit when a round passes without edits.
 
-## Known limitations (v1.1)
+## Run 3 — GDPR / terms / privacy-policy section (automated + dogfood), 2026-09-20
+
+Scope: new `release_audit.py privacy` subcommand (PRV-*) + domains.md §8 rewrite
+(GDPR applicability triage → PRV evidence → browser consent-order checks →
+CMP-001..010 checklist + processor questionnaire).
+
+- `tests/run_fixture_tests.py`: **83/83 assertions pass** (was 68/68). Planted
+  scenarios: shop fixture page linking privacy.html/terms.html with
+  googletagmanager + hotjar scripts → PRV-010 review, PRV-001..005 pass;
+  bare index page → PRV-001/002 warn, PRV-011 pass, PRV-010 absent.
+- One implementation bug caught by the new assertions: PRV-004 pass branch
+  (terms page reachable) was missing — fixture failed first, fix confirmed by a
+  fresh run (the fixture loop working as intended).
+- md-format smoke: privacy table renders; `--gate` semantics unchanged
+  (`review` never trips the gate).
+- Dogfood (read-only): example.com → PRV-001/002 warn; python.org → policy
+  found + reachable + keyword floor, terms warn (not linked from the homepage
+  footer — link-scan heuristic; adequacy remains the agent layer's call).
+- Doc-sync edits: SKILL.md (script list, browser layer, P0/P1 defaults, light
+  mode row), report-guide.md (CMP-001 formalized in the P0 list, CMP namespace
+  note + examples), site-types.md (triage-always-runs note), README (83/83,
+  domain table), integrations.md (consent-order wording), docs/research.md
+  (§3 decision 7, §5 GDPR sources).
+
+## Known limitations (v1.2)
 
 - Single site per audit (no monorepo multi-app).
 - Auth flows only via cookie passthrough; login automation is delegated.
 - GEO citability and compliance are judgment checks, not certifications.
+- PRV-* is a static-HTML floor: JS-injected trackers and self-hosted
+  analytics are invisible to it; consent-order evidence always comes from
+  the browser layer, and PRV link discovery is a homepage-footer heuristic.
 - Walkthrough baseline was contaminated by auto-trigger; a clean baseline
   requires a session without the skill installed.

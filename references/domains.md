@@ -100,15 +100,73 @@ score with the trace file it emits before prescribing fixes.
 - 404 page exists and is styled (check any LNK-001 target by hand).
 - Full exploratory pass = `dogfood` — only on explicit request (expensive).
 
-## 8. Privacy & compliance (judgment; never legal advice)
+## 8. Privacy & compliance — GDPR / terms / privacy policy (script `privacy` + judgment; never legal advice)
 
-| Check | How |
+Three steps: **triage** whether GDPR applies → deterministic evidence (script
+`PRV-*`) plus browser evidence → judgment checklist (`CMP-*`) and the processor
+questionnaire. Everything is presence/config with evidence; every finding says
+"confirm obligations with counsel". Never state or imply legal compliance.
+
+### Step 0 — GDPR applicability triage (always run; cheap)
+
+Record one of: "GDPR applies" or "does not apply — because …". Signals:
+EU locales/hreflang, EUR pricing, `.eu` domain, EU-targeted marketing,
+analytics collecting EU visitors. Non-applicability: explicit EU/EEA
+geo-blocking or an internal-only tool. **An unstated default is the finding**
+(CMP-002). Adjacent regimes (UK GDPR, CCPA/CPRA): one awareness line, not a
+full pass.
+
+### Script layer — `release_audit.py privacy <url>` (homepage + one key route)
+
+| ID | Check | Standard / how |
+|---|---|---|
+| PRV-001/002 | Privacy policy / terms link discoverable | `<a href>` slug keywords + common-path probes (/privacy, /privacy-policy, /datenschutz, /terms, /agb, …) |
+| PRV-003/004 | Discovered policy / terms page fetches 200 | 404/error → warn |
+| PRV-005 | Policy page contains a keyword floor (personal data, cookie(s), GDPR/DSGVO, privacy, 隐私 …) | floor only — content adequacy is CMP-003 |
+| PRV-010 | Known third-party trackers in static HTML (`KNOWN_TRACKER_HOSTS` in the script, compiled 2026-09) | `review` — resolve in the browser layer before assigning severity |
+| PRV-011 | No known trackers in static HTML (JS-injected tags are invisible; SPA caveat) | pass |
+
+### Browser layer (evidence for CMP-005/006/007)
+
+- For each PRV-010 `review`: watch network activity before any consent
+  interaction — a tracker request that fires pre-consent → CMP-005.
+- Banner quality: reject as easy to reach as accept? granular categories?
+  choice changeable later? (CMP-006)
+- Account-holding apps: a delete-account / data-export entry point exists —
+  presence only, never submit real data. (CMP-007)
+
+### Judgment checklist (CMP-*; default severities — `severity_overrides` wins)
+
+| ID | Check | Default |
+|---|---|---|
+| CMP-001 | Collecting personal data with no privacy policy | P0 |
+| CMP-002 | GDPR applicability never assessed / decision unrecorded | P2 |
+| CMP-003 | Policy missing required disclosures: controller identity & contact, purposes, legal bases, data categories, recipients, third-country transfers + basis, retention periods, data-subject rights, right to lodge a complaint | P1 |
+| CMP-004 | No terms of service on an account-holding or purchase app | P2 |
+| CMP-005 | Third-party trackers fire before consent (EU-facing) | P1 |
+| CMP-006 | Consent banner one-sided (reject harder than accept, no granularity, no withdrawal) | P2 |
+| CMP-007 | No data-subject-rights affordances (account deletion / data export) | P1 (saas-app, e-commerce) |
+| CMP-008 | Processor questionnaire incomplete: vendors without DPA; transfers without SCC/adequacy basis | P2 |
+| CMP-009 | High-risk processing without a DPIA (large-scale profiling, special-category data, children's data) | P2 |
+| CMP-010 | Retention schedule / breach-response process unknown | P3 |
+
+CMP-001..010 are fixed IDs; new ones continue from CMP-011.
+
+### Processor & governance questionnaire (ask; record answers as findings — the user's statement is the evidence)
+
+Vendors (hosting, analytics, email, error tracking, payments) × DPA in place? ·
+EU→third-country transfers and their basis (SCCs, adequacy) · retention periods
+per data store · breach-notification owner + 72-hour path · DPIA status.
+
+| Also in this domain | How |
 |---|---|
-| Privacy policy + terms reachable | Footer/header links return 200; pages mention the data actually collected |
-| Cookie consent | If third-party trackers fire before consent → flag; verify banner in browser |
 | Analytics present | Tag/snippet in rendered HTML or confirmed event in the tool |
 | Accessibility statement | Recommend for EU-facing products (EAA) |
-| Wording | "Presence and configuration checks only — confirm obligations with counsel" |
+
+Sources: GDPR (EUR-Lex 32016R0679) Arts. 3, 6–8, 12–14, 15–22, 25, 28, 30,
+32–35 · EDPB guidelines (edpb.europa.eu) · ICO GDPR checklist (ico.org.uk) ·
+CNIL cookies guidance — reviewed 2026-09. Presence/config checks only — confirm
+obligations with counsel.
 
 ## 9. Release ops (questionnaire + artifacts; never assume)
 

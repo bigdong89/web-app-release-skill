@@ -28,6 +28,11 @@ Types: **marketing** · **docs** · **saas-app** (auth-gated product) ·
 | 8 Privacy/compliance | L (if tracking) | — | F | F | F |
 | 9 Release ops | L | — | F | F | F |
 
+Domain 8 note: the GDPR applicability triage (domains.md §8, step 0) always
+runs regardless of weight — it is a recorded decision, not an audit pass; the
+weight applies to the remaining §8 items. `docs` skips the rest, but a privacy
+policy link check (PRV-001) is still cheap courtesy on any public site.
+
 For `saas-app`/`hybrid`: audit public routes with the full SEO/GEO lens and
 app routes with build/HTTP/functional/ops. `key_routes` in
 `.release-check.yml` should split them (e.g. `public: ["/", "/pricing"]`,

@@ -74,9 +74,34 @@ checklists · Octopus/Cortex/CloudBees production-readiness checklists.
    sample.
 6. Triggers narrowed to release/launch scenarios so the gate doesn't hijack
    single-domain SEO/security asks (light mode instead).
+7. Privacy/GDPR stays presence/config at the script layer (PRV-*): link
+   discovery, reachability, static tracker inventory. Legal adequacy (CMP-*)
+   is judgment with "confirm with counsel" wording — the gate collects
+   evidence, it never certifies compliance.
 
 ## 4. Licenses
 
 samber/cc-skills: MIT. addyosmani/web-quality-skills: MIT. This skill's
 re-borrowed thresholds/ideas carry attribution here; no verbatim copying
 beyond short threshold strings that are industry standards anyway.
+
+## 5. Privacy/GDPR check design (added v1.2, 2026-09)
+
+GDPR items live in domain 8 as a two-lane design: deterministic presence
+checks (`PRV-*` in `release_audit.py privacy`) + judgment checklist
+(`CMP-001..010` in references/domains.md §8).
+
+Sources consulted 2026-09 (presence/config references, not legal advice):
+- GDPR regulation text (EUR-Lex 32016R0679) — Arts. 3 (territorial scope),
+  6–8 (lawfulness/consent), 12–14 (transparency), 15–22 (data-subject
+  rights), 25 (by design/default), 28 (processors), 30 (records),
+  32–35 (security, breach notification, DPIA).
+- EDPB guidelines (edpb.europa.eu) — consent, transparency, DPIA guidance.
+- ICO GDPR checklist (ico.org.uk) — the §8 structure: triage → notices →
+  rights → processors.
+- CNIL cookies guidance (cnil.fr) — the banner expectations behind CMP-006.
+
+Tracker host list (`KNOWN_TRACKER_HOSTS` in release_audit.py, compiled
+2026-09) covers common analytics/ads/marketing script hosts. Self-hosted
+analytics are invisible to it by design — the browser layer remains the
+authority for consent-order evidence.

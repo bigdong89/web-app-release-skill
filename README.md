@@ -46,7 +46,7 @@ The skill triggers on launch/release/ship/go-live intents (EN + 中文触发词:
 | Performance | Lighthouse runner (graceful skip) | CWV vs thresholds, budgets |
 | Accessibility | — | axe/Lighthouse + `web-design-guidelines` delegation |
 | Functional QA | — | delegation to `web-gui-tester` / `dogfood` |
-| Privacy & compliance | — | presence/config checks (no legal advice) |
+| Privacy & compliance | `privacy` subcommand: policy/terms link discovery, reachability, third-party tracker detection | GDPR applicability triage, CMP-001..010 checklist, consent-order browser evidence, processor questionnaire (no legal advice) |
 | Release ops | health endpoint | migrations/rollback/monitoring questionnaire |
 
 Design details and threshold sources: [`references/domains.md`](references/domains.md) ·
@@ -55,7 +55,7 @@ prior-art survey: [`docs/research.md`](docs/research.md).
 ## How a run works
 
 1. **Recon** — detect stack/site type, read optional `.release-check.yml` (target URL, key routes, context, thresholds), ask ≤3 questions.
-2. **Audit** — `scripts/release_audit.py` (`headers` / `meta` / `discovery` / `links` / `secrets`) → browser checks for SPA shells → judgment items → optional delegation.
+2. **Audit** — `scripts/release_audit.py` (`headers` / `meta` / `discovery` / `links` / `secrets` / `privacy`) → browser checks for SPA shells and consent order → judgment items → optional delegation.
 3. **Verdict** — scorecard + findings with quoted evidence → **GO iff zero P0**.
 4. **Remediate** — fix, re-run the owning check, log before/after evidence.
 5. **Post-deploy** — re-verify the deployed URL, smoke the critical path, confirm monitoring/rollback.
@@ -68,7 +68,7 @@ warnings instead of false fails, and client-rendered SPA shells yield
 ## Testing
 
 Acceptance is fixture-driven: [`tests/`](tests/) serves a deliberately broken
-site and asserts every planted defect is detected — currently **68/68**.
+site and asserts every planted defect is detected — currently **83/83**.
 
 ```bash
 python3 tests/run_fixture_tests.py

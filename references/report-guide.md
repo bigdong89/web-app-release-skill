@@ -21,7 +21,7 @@ Escalate to **P0**:
   capped at warn by the script)
 - SEO-010 noindex on the homepage · NET-001 target unreachable (production)
 - core-flow failure from functional QA · collecting personal data with no
-  privacy policy (CMP)
+  privacy policy (CMP-001)
 
 Downgrade to **warn/P2**:
 - host-limited platforms (see site-types.md host matrix)
@@ -33,12 +33,16 @@ Downgrade to **warn/P2**:
 **Judgment finding IDs** (invent freely inside these namespaces — never reuse
 script IDs): `LH-*` Lighthouse categories (category below threshold on a key
 route = P1, attach the report file as evidence) · `FUNC-*` functional QA ·
-`CMP-*` compliance · `OPS-*` release ops · `DEPLOY-*` deployment-reality
-mismatches · `A11Y-*` runtime accessibility · `GEO-*` content citability.
+`CMP-*` compliance (CMP-001..010 are fixed with default severities in
+domains.md §8; new IDs continue from CMP-011) · `OPS-*` release ops ·
+`DEPLOY-*` deployment-reality mismatches · `A11Y-*` runtime accessibility ·
+`GEO-*` content citability.
 
 Quick examples: missing description on `/pricing` (SEO-003 fail) → P1 ·
 og:image 100×50 (SOC-003 warn) → P2 · no Cache-Control (PERF-003 info) → P3 ·
-`AKIA…` in app.js (SEC-M-004 fail) → escalation → P0.
+`AKIA…` in app.js (SEC-M-004 fail) → escalation → P0 · trackers fire before
+consent (CMP-005) → P1 · no privacy policy while personal data is collected
+(CMP-001) → escalation → P0.
 
 ## Finding anatomy
 

@@ -160,6 +160,25 @@ EXPECTED = [
         ("SEC-M-004", "fail"),         # AKIA...EXAMPLE
         ("SEC-M-005", "warn"),         # config.json api_key
     ]),
+    ("privacy / shop page links policy+terms and fires trackers", ["privacy", "URL"], [
+        ("PRV-001", "pass"),           # footer link to /privacy.html
+        ("PRV-002", "pass"),           # footer link to /terms.html
+        ("PRV-003", "pass"),           # policy page 200
+        ("PRV-004", "pass"),           # terms page 200
+        ("PRV-005", "pass"),           # keyword floor met
+        ("PRV-010", "review"),         # googletagmanager + hotjar in static HTML
+        ("PRV-011", None),             # mutually exclusive with PRV-010
+        ("PRV-SUM", "info"),
+    ]),
+    ("privacy / bare index page has no policy, terms or trackers", ["privacy", "URL"], [
+        ("PRV-001", "warn"),           # no links; common-path probes 404
+        ("PRV-002", "warn"),
+        ("PRV-003", None),
+        ("PRV-004", None),
+        ("PRV-005", None),
+        ("PRV-010", None),
+        ("PRV-011", "pass"),           # no scripts at all; not an SPA shell
+    ]),
 ]
 
 
@@ -176,12 +195,14 @@ def main():
     url_post = f"http://127.0.0.1:{port}/blog/post.html"
     url_spa = f"http://127.0.0.1:{port}/spa.html"
     url_noindex = f"http://127.0.0.1:{port}/noindex.html"
+    url_shop = f"http://127.0.0.1:{port}/shop.html"
 
     # meta expectations are evaluated against different fixture pages
     PAGE_FOR = {"meta / homepage with empty head": url_index,
                 "meta / post with long title, dup h1, broken JSON-LD, small og:image": url_post,
                 "meta / spa shell becomes review, not fail": url_spa,
-                "meta / noindex page": url_noindex}
+                "meta / noindex page": url_noindex,
+                "privacy / shop page links policy+terms and fires trackers": url_shop}
 
     passed = failed = 0
     try:

@@ -7,6 +7,7 @@ Subcommands:
   discovery <url>  robots.txt, sitemap.xml validity + cross-checks, llms.txt
   links <url>      same-origin crawl for broken links and redirect chains
   secrets <dir>    source maps, .env files, credential patterns in a build output dir
+  privacy <url>    privacy/terms link discovery, page reachability, third-party trackers in static HTML
 
 Output: JSON (default) or Markdown (--format md). With --gate the exit code is 1
 when any finding has status "fail" (CI-friendly).
@@ -15,8 +16,8 @@ Statuses: pass / warn / fail / info / review. "review" means the check needs a
 real browser or human judgment (e.g. client-rendered SPA shell) and must NOT be
 reported as a failure without browser verification.
 
-Judgment-only domains (content quality, legal, UX) are deliberately not covered
-here — see references/domains.md of the web-app-release-skill.
+Judgment-only domains (content quality, UX, legal adequacy) are deliberately
+not covered here — see references/domains.md of the web-app-release-skill.
 """
 
 from __future__ import annotations
@@ -107,6 +108,35 @@ SECRET_PATTERNS = [
 GENERIC_SECRET_RE = re.compile(
     r"(?i)\b(api[_-]?key|secret|token|password)\b['\"]?\s*[:=]\s*['\"][^'\"]{12,}['\"]")
 GENERIC_SECRET_EXTS = {".json", ".yaml", ".yml", ".ini", ".cfg", ".conf", ".xml", ".txt"}
+
+# Third-party analytics/ads/marketing hosts for the privacy check (compiled
+# 2026-09). Suffix match against script/iframe src hostnames. Static-HTML floor
+# only — JS-injected trackers need the browser layer.
+KNOWN_TRACKER_HOSTS = [
+    "googletagmanager.com", "google-analytics.com", "analytics.google.com",
+    "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+    "facebook.net", "hotjar.com", "clarity.ms", "mixpanel.com",
+    "segment.io", "segment.com", "amplitude.com", "fullstory.com",
+    "posthog.com", "plausible.io", "matomo.cloud", "heapanalytics.com",
+    "chartbeat.com", "criteo.com", "criteo.net", "taboola.com", "outbrain.com",
+    "ads-twitter.com", "licdn.com", "sc-static.net", "analytics.tiktok.com",
+    "hs-scripts.com", "intercom.io", "omtrdc.net", "quantserve.com",
+    "scorecardresearch.com", "cloudflareinsights.com", "mc.yandex.ru",
+    "hm.baidu.com",
+]
+
+# Link-discovery vocabulary. Tokens match whole path segments (so "photos"
+# never matches "tos"); substrings cover hyphenated compounds and CJK.
+PRIVACY_LINK_TOKENS = ("privacy", "datenschutz", "confidentiality")
+PRIVACY_LINK_SUBSTRINGS = ("data-protection", "隐私")
+TERMS_LINK_TOKENS = ("terms", "tos", "agb", "conditions", "agreement")
+TERMS_LINK_SUBSTRINGS = ("服务条款", "条款")
+PRIVACY_PAGE_KEYWORDS = ("personal data", "personenbezogen", "data protection",
+                         "gdpr", "dsgvo", "cookie", "隐私", "个人信息")
+PRIVACY_PATH_PROBES = ("/privacy", "/privacy-policy", "/privacy_policy",
+                       "/legal/privacy", "/datenschutz")
+TERMS_PATH_PROBES = ("/terms", "/terms-of-service", "/terms_of_service",
+                     "/legal/terms", "/agb")
 
 
 def finding(fid, status, message, evidence="", fix=""):
@@ -217,6 +247,7 @@ class PageParser(HTMLParser):
         self.h1 = 0
         self.a_hrefs = []
         self.res_srcs = []       # img/script/iframe/source/video src, link href
+        self.script_srcs = []    # <script src> and <iframe src> — tracker detection scans both
         self.jsonld = []
         self.robots_meta = ""
         self.lang = ""
@@ -251,6 +282,8 @@ class PageParser(HTMLParser):
                     self._ld_buf = []
                     return
             self.res_srcs.append(a.get("src", ""))
+            if tag in ("script", "iframe"):
+                self.script_srcs.append(a.get("src", ""))
         if tag in ("script", "style") and self._ld_buf is None:
             self._skip_depth += 1
 
@@ -919,6 +952,125 @@ def cmd_secrets(args):
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: privacy
+# ---------------------------------------------------------------------------
+def _find_policy_link(page, base_url, tokens, substrings):
+    """First <a href> whose path matches the vocabulary; None when absent."""
+    for href in page.a_hrefs:
+        h = (href or "").strip()
+        if not h or h.startswith(("#", "mailto:", "tel:", "javascript:", "data:")):
+            continue
+        low = h.lower()
+        parts = re.split(r"[^a-z0-9]+", low)
+        if any(t in parts for t in tokens) or any(s in low for s in substrings):
+            return urljoin(base_url, h.split("#", 1)[0])
+    return None
+
+
+def _probe_paths(base_url, paths, req_h, timeout):
+    """First common path that answers < 400; None when all fail."""
+    for path in paths:
+        res = fetch(urljoin(base_url, path), req_h, timeout)
+        if not res.error and res.status < 400:
+            return res
+    return None
+
+
+def cmd_privacy(args):
+    started = time.time()
+    url = args.url
+    req_h = request_headers(args)
+    out = []
+    res = fetch(url, req_h, args.timeout)
+    if res.error:
+        out.append(finding("NET-001", "fail", "Target unreachable",
+                           evidence=f"{url} -> {res.error}"))
+        return assemble(url, args.context, out, started)
+
+    text, note = decode_body(res)
+    if note or not text:
+        out.append(finding("BODY-001", "review",
+                           f"Body not decoded ({note}); privacy checks need a browser"))
+        return assemble(url, args.context, out, started)
+
+    page = parse_page(text)
+    base = res.url or url
+
+    # Third-party trackers in the static HTML.
+    found_hosts = set()
+    for src in page.script_srcs:
+        host = (urlsplit(src).hostname or "").lower()
+        if not host:
+            continue
+        for entry in KNOWN_TRACKER_HOSTS:
+            if host == entry or host.endswith("." + entry):
+                found_hosts.add(entry)
+    if found_hosts:
+        out.append(finding("PRV-010", "review",
+                           f"{len(found_hosts)} known third-party tracker host(s) in static HTML; "
+                           "verify in a browser that they only fire after consent",
+                           evidence=", ".join(sorted(found_hosts)),
+                           fix="Gate these scripts behind the consent banner, or drop them."))
+    else:
+        caveat = " (SPA shell: JS-injected tags are invisible here)" if page.is_spa_shell() else ""
+        out.append(finding("PRV-011", "pass",
+                           "No known third-party trackers in static HTML" + caveat))
+
+    # Privacy policy: discover via link scan, fall back to common-path probes.
+    policy_link = _find_policy_link(page, base, PRIVACY_LINK_TOKENS, PRIVACY_LINK_SUBSTRINGS)
+    policy_res = (fetch(policy_link, req_h, args.timeout) if policy_link
+                  else _probe_paths(base, PRIVACY_PATH_PROBES, req_h, args.timeout))
+    if policy_link is None and policy_res is None:
+        out.append(finding("PRV-001", "warn", "No privacy policy link found on the page",
+                           evidence=f"link-keyword scan + {len(PRIVACY_PATH_PROBES)} common-path probes empty",
+                           fix="Link the privacy policy from every page (footer) at a stable URL."))
+    else:
+        out.append(finding("PRV-001", "pass", "Privacy policy found",
+                           evidence=policy_link or policy_res.url))
+        if policy_res.error or policy_res.status >= 400:
+            out.append(finding("PRV-003", "warn", "Privacy policy page unreachable",
+                               evidence=f"GET {policy_link or policy_res.url} -> "
+                                        f"{policy_res.error or policy_res.status}"))
+        else:
+            out.append(finding("PRV-003", "pass", "Privacy policy page reachable",
+                               evidence=policy_res.url))
+            doc_text, doc_note = decode_body(policy_res)
+            if doc_note or not doc_text or not any(
+                    k in doc_text.lower() for k in PRIVACY_PAGE_KEYWORDS):
+                out.append(finding("PRV-005", "review",
+                                   "Privacy policy lacks the keyword floor; read it and judge "
+                                   "content adequacy (CMP-003)",
+                                   evidence=f"GET {policy_res.url}"))
+            else:
+                out.append(finding("PRV-005", "pass", "Privacy policy contains the keyword floor"))
+
+    # Terms: same discovery, no keyword floor.
+    terms_link = _find_policy_link(page, base, TERMS_LINK_TOKENS, TERMS_LINK_SUBSTRINGS)
+    terms_res = (fetch(terms_link, req_h, args.timeout) if terms_link
+                 else _probe_paths(base, TERMS_PATH_PROBES, req_h, args.timeout))
+    if terms_link is None and terms_res is None:
+        out.append(finding("PRV-002", "warn", "No terms link found on the page",
+                           evidence=f"link-keyword scan + {len(TERMS_PATH_PROBES)} common-path probes empty",
+                           fix="Link the terms of service from every page (footer) at a stable URL."))
+    else:
+        out.append(finding("PRV-002", "pass", "Terms found",
+                           evidence=terms_link or terms_res.url))
+        if terms_res.error or terms_res.status >= 400:
+            out.append(finding("PRV-004", "warn", "Terms page unreachable",
+                               evidence=f"GET {terms_link or terms_res.url} -> "
+                                        f"{terms_res.error or terms_res.status}"))
+        else:
+            out.append(finding("PRV-004", "pass", "Terms page reachable",
+                               evidence=terms_res.url))
+
+    out.append(finding("PRV-SUM", "info",
+                       f"Privacy scan: trackers={len(found_hosts)} host(s); "
+                       f"policy={'found' if (policy_link or policy_res) else 'missing'}; "
+                       f"terms={'found' if (terms_link or terms_res) else 'missing'}"))
+    return assemble(url, args.context, out, started)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main(argv=None):
@@ -952,6 +1104,11 @@ def main(argv=None):
     p.add_argument("dir")
     add_common_args(p)
     p.set_defaults(func=cmd_secrets)
+
+    p = sub.add_parser("privacy", help="privacy/terms link discovery, page reachability, third-party trackers in static HTML")
+    p.add_argument("url")
+    add_common_args(p)
+    p.set_defaults(func=cmd_privacy)
 
     args = ap.parse_args(argv)
     report = args.func(args)
