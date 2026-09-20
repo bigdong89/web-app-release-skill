@@ -101,7 +101,25 @@ all fixed in one pass:
 Deferred to a later version: PRV-020 form/signup heuristic (CMP-001 evidence
 hook), user-extensible tracker host list, probe-success fixture coverage.
 
-## Known limitations (v1.2)
+## Run 5 — security review section (v1.3), 2026-09-20
+
+Scope: new `release_audit.py security` subcommand (SEC-X-001..050) + dangerous
+sink scan in `secrets` (SEC-M-006/007) + security.txt (DIS-009) + domains.md
+§2b (perimeter scan framing: the gate is not a penetration test).
+
+- `tests/run_fixture_tests.py`: **102/102 assertions pass** (was 89/89). New
+  planted scenarios: app.js innerHTML + postMessage('*') sinks → SEC-M-006/007
+  warn; security on bare index → all perimeter checks pass/info; security on
+  shop → tracker scripts downgraded to SRI-exempt info.
+- SPA-fallback false-positive guard: exposure probes compare response bodies
+  against a 404-reference fetch, so history-API rewrites are not "exposure".
+- Severity wiring: SEC-X-001 escalates to P0 on public production
+  (report-guide + SKILL.md); SEC-X-050 disambiguates TLS failures from
+  generic NET-001.
+- Red line added to SKILL.md: gate ≠ pentest; access-control testing
+  delegated to web-gui-tester with user-approved credentials only.
+
+## Known limitations (v1.3)
 
 - Single site per audit (no monorepo multi-app).
 - Auth flows only via cookie passthrough; login automation is delegated.

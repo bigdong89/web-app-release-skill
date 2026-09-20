@@ -39,8 +39,8 @@ The skill triggers on launch/release/ship/go-live intents (EN + 中文触发词:
 
 | Domain | Deterministic (script) | Judgment (agent) |
 |---|---|---|
-| Build hygiene | source maps / .env / credential patterns in dist | build, `npm audit`, tests |
-| HTTP & infra | TLS, redirect chains, 7 security headers, cookie flags, compression, mixed content | — |
+| Build hygiene | source maps / .env / credential patterns / dangerous-JS sinks in dist | build, `npm audit`, tests |
+| HTTP & infra | TLS, redirect chains, 7 security headers, cookie flags, compression, mixed content; exposure probes, SRI, CSP quality, CORS, 404 debug leak, TLS diagnosis | security questionnaire (domains.md §2b) |
 | SEO | title/description/canonical/H1/JSON-LD/OG/favicon, robots.txt, sitemap validity + cross-checks, dead links | — |
 | GEO (AI search) | llms.txt, AI-crawler robots rules | citability heuristics |
 | Performance | Lighthouse runner (graceful skip) | CWV vs thresholds, budgets |
@@ -55,7 +55,7 @@ prior-art survey: [`docs/research.md`](docs/research.md).
 ## How a run works
 
 1. **Recon** — detect stack/site type, read optional `.release-check.yml` (target URL, key routes, context, thresholds), ask ≤3 questions.
-2. **Audit** — `scripts/release_audit.py` (`headers` / `meta` / `discovery` / `links` / `secrets` / `privacy`) → browser checks for SPA shells and consent order → judgment items → optional delegation.
+2. **Audit** — `scripts/release_audit.py` (`headers` / `security` / `meta` / `discovery` / `links` / `secrets` / `privacy`) → browser checks for SPA shells and consent order → judgment items → optional delegation.
 3. **Verdict** — scorecard + findings with quoted evidence → **GO iff zero P0**.
 4. **Remediate** — fix, re-run the owning check, log before/after evidence.
 5. **Post-deploy** — re-verify the deployed URL, smoke the critical path, confirm monitoring/rollback.
@@ -68,7 +68,7 @@ warnings instead of false fails, and client-rendered SPA shells yield
 ## Testing
 
 Acceptance is fixture-driven: [`tests/`](tests/) serves a deliberately broken
-site and asserts every planted defect is detected — currently **89/89**.
+site and asserts every planted defect is detected — currently **102/102**.
 
 ```bash
 python3 tests/run_fixture_tests.py

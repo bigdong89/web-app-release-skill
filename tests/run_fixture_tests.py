@@ -145,6 +145,7 @@ EXPECTED = [
         ("DIS-005", "warn"),           # /private/ blocked by robots yet in sitemap
         ("DIS-007", "info"),           # AI crawler summary
         ("DIS-008", None),
+        ("DIS-009", "info"),           # no security.txt
         ("GEO-001", "warn"),           # no llms.txt
         ("GEO-002", None),
     ]),
@@ -159,6 +160,8 @@ EXPECTED = [
         ("SEC-M-003", "fail"),         # private key
         ("SEC-M-004", "fail"),         # AKIA...EXAMPLE
         ("SEC-M-005", "warn"),         # config.json api_key
+        ("SEC-M-006", "warn"),         # app.js innerHTML sink
+        ("SEC-M-007", "warn"),         # app.js postMessage '*'
     ]),
     ("privacy / shop page links policy+terms and fires trackers", ["privacy", "URL"], [
         ("PRV-001", "pass"),           # footer link to /privacy.html
@@ -188,6 +191,20 @@ EXPECTED = [
         ("PRV-005", None),             # unreachable page -> no keyword floor
         ("PRV-002", "warn"),           # no terms link; probes 404
     ]),
+    ("security / index page: clean perimeter", ["security", "URL"], [
+        ("SEC-X-001", "pass"),         # all probe paths 404 on the fixture
+        ("SEC-X-010", "pass"),         # no cross-origin resources
+        ("SEC-X-020", "info"),         # no CSP header to grade
+        ("SEC-X-030", "pass"),         # 404 page has no debug signatures
+        ("SEC-X-040", "info"),         # no CORS headers
+        ("SEC-X-050", None),           # no TLS error on plain HTTP
+        ("SEC-X-SUM", "info"),
+    ]),
+    ("security / shop page: tracker scripts are SRI-exempt dynamic loaders", ["security", "URL"], [
+        ("SEC-X-010", "info"),         # googletagmanager + hotjar cannot carry SRI
+        ("SEC-X-001", "pass"),
+        ("SEC-X-040", "info"),
+    ]),
 ]
 
 
@@ -212,7 +229,8 @@ def main():
                 "meta / spa shell becomes review, not fail": url_spa,
                 "meta / noindex page": url_noindex,
                 "privacy / shop page links policy+terms and fires trackers": url_shop,
-                "privacy / spa shell: no static tracker evidence -> review; broken policy link -> warn": url_spa}
+                "privacy / spa shell: no static tracker evidence -> review; broken policy link -> warn": url_spa,
+                "security / shop page: tracker scripts are SRI-exempt dynamic loaders": url_shop}
 
     passed = failed = 0
     try:

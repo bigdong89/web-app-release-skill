@@ -19,7 +19,9 @@ Escalate to **P0**:
 - SEC-M-002 / SEC-M-003 / SEC-M-004 (credentials or keys in build output)
 - HTTP-001 fail on a **public** production URL (loopback targets are already
   capped at warn by the script)
-- SEO-010 noindex on the homepage · NET-001 target unreachable (production)
+- SEO-010 noindex on the homepage · NET-001 / SEC-X-050 target unreachable
+  (production)
+- SEC-X-001 sensitive paths exposed on a **public** production URL
 - core-flow failure from functional QA · collecting personal data with no
   privacy policy (CMP-001)
 

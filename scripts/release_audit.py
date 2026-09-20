@@ -8,6 +8,7 @@ Subcommands:
   links <url>      same-origin crawl for broken links and redirect chains
   secrets <dir>    source maps, .env files, credential patterns in a build output dir
   privacy <url>    privacy/terms link discovery, page reachability, third-party trackers in static HTML
+  security <url>   sensitive-path exposure, SRI, CSP quality, CORS, 404 debug leak, TLS diagnosis
 
 Output: JSON (default) or Markdown (--format md). With --gate the exit code is 1
 when any finding has status "fail" (CI-friendly).
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import http.client
 import json
 import re
@@ -138,6 +140,44 @@ PRIVACY_PATH_PROBES = ("/privacy", "/privacy-policy", "/privacy_policy",
 TERMS_PATH_PROBES = ("/terms", "/terms-of-service", "/terms_of_service",
                      "/legal/terms", "/agb")
 
+# Paths that must never be publicly served (compiled 2026-09 from common
+# deployment-leak reports). Probed with GET only — read-only, no exploitation.
+SECURITY_PROBE_PATHS = [
+    ("/.env", "dotenv file"),
+    ("/.git/HEAD", "git repository metadata"),
+    ("/.DS_Store", "macOS resource fork"),
+    ("/.svn/entries", "svn repository metadata"),
+    ("/backup.zip", "backup archive"),
+    ("/dump.sql", "SQL dump"),
+    ("/db.sqlite3", "SQLite database"),
+    ("/server-status", "Apache status endpoint"),
+    ("/debug/vars", "Go expvar endpoint"),
+    ("/actuator/env", "Spring Boot actuator"),
+    ("/.aws/credentials", "AWS credentials file"),
+]
+DEBUG_LEAK_SIGNATURES = [
+    "Traceback (most recent call last)",
+    "DEBUG = True",
+    "Whoops, looks like something went wrong",
+    "Stack trace:",
+    "at org.springframework",
+    "Warning: Undefined",
+]
+TLS_ERROR_SIGNATURES = ("CERTIFICATE_VERIFY_FAILED", "SSL", "certificate")
+
+# Dangerous sinks in shipped JS — warn-level evidence hooks; exploitability is
+# the agent's judgment (bundled polyfills sometimes legitimately contain eval).
+DANGEROUS_API_PATTERNS = [
+    ("SEC-M-006", "innerHTML assignment", re.compile(r"\.innerHTML\s*=")),
+    ("SEC-M-006", "dangerouslySetInnerHTML", re.compile(r"dangerouslySetInnerHTML")),
+    ("SEC-M-006", "document.write", re.compile(r"document\.write\s*\(")),
+    ("SEC-M-006", "eval call", re.compile(r"\beval\s*\(")),
+    ("SEC-M-006", "new Function", re.compile(r"new\s+Function\s*\(")),
+    ("SEC-M-006", "v-html directive", re.compile(r"\bv-html\b")),
+]
+WILDCARD_POSTMESSAGE_RE = re.compile(r"postMessage\([^;]{0,200}?,\s*['\"]\*['\"]")
+DANGEROUS_API_EXTS = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".html"}
+
 
 def finding(fid, status, message, evidence="", fix=""):
     return {"id": fid, "status": status, "message": message,
@@ -248,6 +288,7 @@ class PageParser(HTMLParser):
         self.a_hrefs = []
         self.res_srcs = []       # img/script/iframe/source/video src, link href
         self.script_srcs = []    # <script src> and <iframe src> — tracker detection scans both
+        self.ext_resources = []  # (tag, absolute-url, has_integrity) for SRI checks
         self.jsonld = []
         self.robots_meta = ""
         self.lang = ""
@@ -268,6 +309,9 @@ class PageParser(HTMLParser):
             rel = a.get("rel", "").lower()
             self.link_rels.append((rel, a.get("href", "")))
             self.res_srcs.append(a.get("href", ""))
+            href = a.get("href", "")
+            if "stylesheet" in rel and href.startswith(("http://", "https://")):
+                self.ext_resources.append(("link", href, "integrity" in a))
         elif tag == "title":
             self._in_title = True
         elif tag == "h1":
@@ -284,6 +328,9 @@ class PageParser(HTMLParser):
             self.res_srcs.append(a.get("src", ""))
             if tag in ("script", "iframe"):
                 self.script_srcs.append(a.get("src", ""))
+            src = a.get("src", "")
+            if tag == "script" and src.startswith(("http://", "https://")):
+                self.ext_resources.append(("script", src, "integrity" in a))
         if tag in ("script", "style") and self._ld_buf is None:
             self._skip_depth += 1
 
@@ -823,6 +870,13 @@ def cmd_discovery(args):
                            fix="Consider llms.txt: a short markdown overview linking key pages for AI crawlers."))
     else:
         out.append(finding("GEO-002", "pass", "llms.txt present"))
+
+    sectxt = fetch(base + "/.well-known/security.txt", req_h, args.timeout)
+    if sectxt.error or sectxt.status != 200 or not sectxt.raw.strip():
+        out.append(finding("DIS-009", "info", "No security.txt (RFC 9116) — no published security contact",
+                           fix="Add /.well-known/security.txt with Contact: and Policy: fields."))
+    else:
+        out.append(finding("DIS-009", "pass", "security.txt present"))
     return assemble(url, args.context, out, started)
 
 
@@ -940,6 +994,17 @@ def cmd_secrets(args):
                     out.append(finding(fid, "fail", f"{label} in build output",
                                        evidence=f"{rel}:{i}: {m.group(0)[:6]}…[redacted]",
                                        fix="Remove the credential, rotate it, and rebuild."))
+            if path.suffix.lower() in DANGEROUS_API_EXTS:
+                for fid, label, rx in DANGEROUS_API_PATTERNS:
+                    if rx.search(line):
+                        out.append(finding(fid, "warn", f"{label} sink in shipped code",
+                                           evidence=f"{rel}:{i}",
+                                           fix="Review the sink: escape or framework-fence any user-controlled input before it reaches it."))
+                        break  # one sink per line is enough signal
+                if WILDCARD_POSTMESSAGE_RE.search(line):
+                    out.append(finding("SEC-M-007", "warn", "postMessage with '*' target origin",
+                                       evidence=f"{rel}:{i}",
+                                       fix="Pin the exact target origin — '*' lets any window receive messages."))
             if path.suffix.lower() in GENERIC_SECRET_EXTS:
                 m = GENERIC_SECRET_RE.search(line)
                 if m:
@@ -1093,6 +1158,166 @@ def cmd_privacy(args):
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: security
+# ---------------------------------------------------------------------------
+def cmd_security(args):
+    started = time.time()
+    url = args.url
+    req_h = request_headers(args)
+    out = []
+    res = fetch(url, req_h, args.timeout)
+    if res.error:
+        err = res.error
+        if any(sig in err for sig in TLS_ERROR_SIGNATURES):
+            out.append(finding("SEC-X-050", "fail", "TLS certificate verification failed",
+                               evidence=f"{url} -> {err}",
+                               fix="Fix the certificate (expired, self-signed, or hostname mismatch) — this is a cert problem, not infrastructure."))
+        out.append(finding("NET-001", "fail", "Target unreachable",
+                           evidence=f"{url} -> {err}"))
+        return assemble(url, args.context, out, started)
+
+    text, note = decode_body(res)
+    if note or not text:
+        out.append(finding("BODY-001", "review",
+                           f"Body not decoded ({note}); security checks need a browser"))
+        return assemble(url, args.context, out, started)
+
+    page = parse_page(text)
+    base = res.url or url
+    origin_host = (urlsplit(base).hostname or "").lower()
+    hdr = res.headers
+
+    # Reference response for "what does this server do with unknown paths" —
+    # lets us tell framework rewrites (SPA fallback) apart from real exposure.
+    fallback = fetch(urljoin(base, "/definitely-not-here-audit-probe"), req_h, args.timeout)
+    fb_text, fb_note = (None, "no-fallback")
+    if not fallback.error and fallback.status >= 400:
+        fb_text, fb_note = decode_body(fallback)
+    fb_digest = (hashlib.sha256(fb_text.encode("utf-8", "replace")).hexdigest()
+                 if fb_text and not fb_note else None)
+
+    # 1) Sensitive path exposure (GET-only probes).
+    exposed, protected = [], []
+    for path, label in SECURITY_PROBE_PATHS:
+        r = fetch(urljoin(base, path), req_h, args.timeout)
+        if r.error:
+            continue
+        if r.status in (401, 403):
+            protected.append(f"{path} ({r.status})")
+            continue
+        if r.status == 200 and r.raw:
+            t, n = decode_body(r)
+            digest = (hashlib.sha256((t or "").encode("utf-8", "replace")).hexdigest()
+                      if not n else None)
+            if fb_digest is not None and digest == fb_digest:
+                continue  # SPA/framework rewrite of unknown paths, not exposure
+            exposed.append(f"{path} -> HTTP 200 ({label})")
+    if exposed:
+        out.append(finding("SEC-X-001", ctx_status(args, "fail"),
+                           f"{len(exposed)} sensitive path(s) exposed on the server",
+                           evidence="; ".join(exposed[:6]),
+                           fix="Remove these files/endpoints from the deployment; serve 404/403."))
+    else:
+        extra = f"; {len(protected)} protected (401/403)" if protected else ""
+        out.append(finding("SEC-X-001", "pass",
+                           f"No sensitive paths exposed ({len(SECURITY_PROBE_PATHS)} probed{extra})"))
+
+    # 2) SRI on cross-origin scripts/stylesheets.
+    sri_missing = []
+    for tag, src, has_integrity in page.ext_resources:
+        host = (urlsplit(src).hostname or "").lower()
+        if not host or host == origin_host or has_integrity:
+            continue
+        if any(host == e or host.endswith("." + e) for e in KNOWN_TRACKER_HOSTS):
+            sri_missing.append(f"{tag} {src} (dynamic loader; SRI n/a — restrict via CSP)")
+        else:
+            sri_missing.append(f"{tag} {src}")
+    hard = [e for e in sri_missing if "dynamic loader" not in e]
+    if hard:
+        out.append(finding("SEC-X-010", "warn",
+                           f"{len(hard)} cross-origin resource(s) without SRI",
+                           evidence="; ".join(sri_missing[:6]),
+                           fix='Add integrity="sha384-…" to CDN scripts/stylesheets, or self-host.'))
+    elif sri_missing:
+        out.append(finding("SEC-X-010", "info",
+                           "Cross-origin scripts without SRI are all dynamic loaders (tag managers)",
+                           evidence="; ".join(sri_missing[:4])))
+    else:
+        out.append(finding("SEC-X-010", "pass", "No cross-origin resources, or all carry integrity"))
+
+    # 3) CSP quality (presence itself is the headers subcommand's SEC-001).
+    csp = (hdr.get("Content-Security-Policy") if hdr else "") or ""
+    csp_ro = (hdr.get("Content-Security-Policy-Report-Only") if hdr else "") or ""
+    if csp:
+        directives = {}
+        for part in csp.split(";"):
+            bits = part.strip().split()
+            if bits:
+                directives[bits[0].lower()] = bits[1:]
+        script_dirs = directives.get("script-src", directives.get("default-src", []))
+        problems = []
+        if "unsafe-inline" in script_dirs:
+            problems.append("'unsafe-inline' in script context")
+        if "unsafe-eval" in script_dirs:
+            problems.append("'unsafe-eval' in script context")
+        if "*" in script_dirs:
+            problems.append("wildcard script source list")
+        if not script_dirs:
+            problems.append("no script-src/default-src allowlist")
+        style_inline = "unsafe-inline" in directives.get(
+            "style-src", directives.get("default-src", []))
+        style_note = " (style-src 'unsafe-inline' is common; tighten when practical)" if style_inline else ""
+        if problems:
+            out.append(finding("SEC-X-020", "warn", "CSP present but weak: " + "; ".join(problems),
+                               evidence=csp[:200],
+                               fix="Allow-list script sources; nonce/hash-based CSP instead of unsafe keywords."))
+        else:
+            out.append(finding("SEC-X-020", "pass", "CSP restricts script sources" + style_note))
+    elif csp_ro:
+        out.append(finding("SEC-X-020", "info", "CSP is Report-Only — enforce it before launch",
+                           evidence=csp_ro[:120]))
+    else:
+        out.append(finding("SEC-X-020", "info",
+                           "No CSP header to grade here (presence itself is SEC-001 in the headers subcommand)"))
+
+    # 4) 404 page debug leak (reuses the fallback reference response).
+    if fb_text:
+        hits = [s for s in DEBUG_LEAK_SIGNATURES if s in fb_text]
+        if hits:
+            out.append(finding("SEC-X-030", "warn", "Not-found page leaks framework/debug details",
+                               evidence="; ".join(hits[:3]),
+                               fix="Return a generic styled 404 and disable debug mode in production."))
+        else:
+            out.append(finding("SEC-X-030", "pass", "404 page carries no framework/debug signatures"))
+
+    # 5) CORS: wildcard = info; arbitrary-Origin reflection + credentials = fail.
+    acao = (hdr.get("Access-Control-Allow-Origin") if hdr else "") or ""
+    acac = (hdr.get("Access-Control-Allow-Credentials") if hdr else "") or ""
+    if acao:
+        probe_origin = "https://release-audit-probe.example"
+        refl = fetch(url, {**req_h, "Origin": probe_origin}, args.timeout)
+        racao = (refl.headers.get("Access-Control-Allow-Origin") if refl.headers else "") or ""
+        if "true" in acac.lower() and racao == probe_origin:
+            out.append(finding("SEC-X-040", ctx_status(args, "fail"),
+                               "CORS reflects arbitrary Origin with credentials allowed",
+                               evidence=f"probe Origin echoed as ACAO: {racao}; Allow-Credentials: {acac}",
+                               fix="Allow-list known origins; never reflect arbitrary origins with credentials."))
+        elif acao.strip() == "*":
+            out.append(finding("SEC-X-040", "info",
+                               "CORS allows any origin — fine for public data; verify private endpoints do not share this config",
+                               evidence="Access-Control-Allow-Origin: *"))
+        else:
+            out.append(finding("SEC-X-040", "pass", f"CORS restricted: {acao[:60]}"))
+    else:
+        out.append(finding("SEC-X-040", "info", "No CORS headers on this page (same-origin only)"))
+
+    out.append(finding("SEC-X-SUM", "info",
+                       f"Security scan: {len(exposed)} exposed path(s), {len(sri_missing)} SRI gap(s), "
+                       f"csp={'graded' if (csp or csp_ro) else 'absent'}"))
+    return assemble(url, args.context, out, started)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main(argv=None):
@@ -1104,6 +1329,11 @@ def main(argv=None):
     p.add_argument("url")
     add_common_args(p)
     p.set_defaults(func=cmd_headers)
+
+    p = sub.add_parser("security", help="sensitive-path exposure, SRI, CSP quality, CORS, 404 debug leak, TLS diagnosis")
+    p.add_argument("url")
+    add_common_args(p)
+    p.set_defaults(func=cmd_security)
 
     p = sub.add_parser("meta", help="title/description/canonical/OG/H1/JSON-LD/favicon checks")
     p.add_argument("url")

@@ -106,3 +106,16 @@ Tracker host list (`KNOWN_TRACKER_HOSTS` in release_audit.py, compiled
 2026-09) covers common analytics/ads/marketing script hosts. Self-hosted
 analytics are invisible to it by design — the browser layer remains the
 authority for consent-order evidence.
+
+## 6. Security check sources (added v1.3, 2026-09)
+
+- OWASP Top 10 (2021) & ASVS 4.x — scope calibration: the gate covers the
+  deterministic slice of V05 (validation), V09 (communications) and V14
+  (config); behavioral access-control testing (V04/V07) is delegated, and
+  penetration testing stays external to the gate.
+- CIS "HTTP security headers" benchmark — header quality expectations behind
+  SEC-X-020.
+- MDN Subresource Integrity — SRI semantics and the dynamic-loader exception
+  behind SEC-X-010.
+- Exposure-probe path list (SEC-X-001) compiled 2026-09 from common
+  deployment-leak reports: .env, .git, backup/dump files, debug endpoints.

@@ -13,7 +13,7 @@ numbers that may have moved (Core Web Vitals, crawler lists).
 |---|---|---|
 | SEC-M-001..005 | Script `secrets <dist>`: no source maps, no .env, no credential patterns in the bundle | Rotate any leaked credential, rebuild |
 | Build passes (judgment) | Run the project's build command; a release audit on a red build stops there | Fix build errors first |
-| Dependency vulns (judgment) | `npm audit --omit=dev` / `pnpm audit --prod`; block on high/critical in prod deps | Bump or patch; document accepted risk |
+| Dependency vulns (judgment) | `npm audit --omit=dev --json` (attach output as evidence) / `pnpm audit --prod` / `pip-audit` for Python; block on high/critical in prod deps | Bump or patch; document accepted risk |
 | Types/lint/tests (judgment) | Project's own checks green | Fix before further audit |
 
 ## 2. HTTP & infrastructure (headers script)
@@ -29,6 +29,41 @@ numbers that may have moved (Core Web Vitals, crawler lists).
 | PERF-003 | Cache-Control on documents | HTML `no-cache`; hashed assets `immutable` |
 | MIXED-001 | No http:// subresources on HTTPS pages | Browser blocks/mixed-badge risk |
 | REDIR-001 | Redirect chains ≤ 3 hops | Each hop adds latency; update links |
+
+## 2b. Security review — exposure, SRI, CSP quality (script `security` + judgment)
+
+Findings scorecard into "HTTP & infrastructure" (SEC-X-*) and "Build hygiene"
+(SEC-M-006/007). The gate is a presence/config perimeter scan — it is **not a
+penetration test**: no injection payloads, no auth-bypass attempts, no
+rate-limit probing. Applies to every site type (domain 2 weight is F).
+
+Script (`security <url>`, homepage + one key route; all GET-only):
+
+| ID | Check | Standard / how |
+|---|---|---|
+| SEC-X-001 | Sensitive paths exposed (/.env, /.git/HEAD, /.DS_Store, backup/dump files, /actuator/env, /debug/vars, …) | 200 with body ≠ the 404/fallback reference → fail; 401/403 = protected |
+| SEC-X-010 | Cross-origin scripts/styles without `integrity` (SRI) | warn; dynamic loaders (tag managers) → info, restrict via CSP instead |
+| SEC-X-020 | CSP quality: 'unsafe-inline'/'unsafe-eval' in script context, wildcard or missing script allowlist, Report-Only at launch | warn / info |
+| SEC-X-030 | 404 page leaking framework/debug signatures (Traceback, DEBUG=True, …) | warn |
+| SEC-X-040 | CORS: wildcard → info; reflecting a probe Origin with credentials → fail | one GET with a canary Origin header |
+| SEC-X-050 | TLS verification failure diagnosis (expired/self-signed/hostname) | fail — fix the certificate, not infrastructure |
+| SEC-M-006/007 (`secrets` extension) | Dangerous sinks in shipped JS: innerHTML assignment, dangerouslySetInnerHTML, document.write, eval, new Function, v-html; postMessage '*' target | warn with file:line — exploitability is your judgment |
+
+Judgment: CSP policy review against the app's real inline-script needs ·
+dependency audit per §1 (evidence attached) · secrets rotation policy.
+
+Questionnaire (ask; record answers as findings — the user's statement is the
+evidence): rate limiting on auth endpoints? · MFA available for admin roles? ·
+backup restore rehearsed (not just taken)? · CI/CD least-privilege (workflow
+permissions, pinned actions)?
+
+Delegation: access-control / IDOR / session flows → `browser-use:web-gui-tester`
+with user-approved test credentials only (integrations.md). A periodic
+external penetration test stays outside this gate — recommend one before
+major launches.
+
+Sources: OWASP Top 10 (2021) & ASVS 4.x · CIS HTTP security headers benchmark ·
+MDN Subresource Integrity — reviewed 2026-09.
 
 ## 3. SEO (meta / discovery / links scripts)
 

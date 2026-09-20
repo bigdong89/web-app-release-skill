@@ -9,3 +9,7 @@ async function callApi() {
 }
 
 callApi();
+
+// Planted security-review fixtures (all values fake).
+el.innerHTML = userInput;
+window.postMessage(msg, "*");

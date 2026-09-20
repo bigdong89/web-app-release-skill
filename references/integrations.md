@@ -11,6 +11,7 @@ user didn't ask for.
 | Targeted functional test of P0 flows | `browser-use:web-gui-tester` | Medium | Hand it the flow list + URL + test credentials; require its evidence-per-assertion report |
 | Full exploratory QA pass | `dogfood` | Expensive (long session) | Only on explicit user request; point at the target URL and auth state; its issue taxonomy maps to our severities |
 | `better-auth` in package.json | `better-auth-best-practices` | Medium | Audit config against its Security section; findings like any other |
+| Access-control probing (IDOR / session / auth flows) | `browser-use:web-gui-tester` | Expensive (on request) | Hand over user-approved test credentials + the flows to try; the gate itself never attempts bypass |
 | Any completion claim | `superpowers:verification-before-completion` | Free (discipline) | Always: fresh command output before "fixed"/"passing" |
 | Release includes code changes heading for merge | `superpowers:requesting-code-review` | Medium | After P0/P1 remediation, before merge |
 
