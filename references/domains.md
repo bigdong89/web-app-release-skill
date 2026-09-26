@@ -60,7 +60,10 @@ permissions, pinned actions)?
 Delegation: access-control / IDOR / session flows → `browser-use:web-gui-tester`
 with user-approved test credentials only (integrations.md). A periodic
 external penetration test stays outside this gate — recommend one before
-major launches.
+major launches. For agent-driven deep discovery in that slot, delegate to
+`security-audit` (cloudflare/security-audit-skill, on request only — see
+integrations.md); it complements but never replaces a human pentest on
+high-stakes launches.
 
 Sources: OWASP Top 10 (2021) & ASVS 4.x · CIS HTTP security headers benchmark ·
 MDN Subresource Integrity — reviewed 2026-09.

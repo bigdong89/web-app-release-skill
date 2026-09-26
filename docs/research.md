@@ -119,3 +119,9 @@ authority for consent-order evidence.
   behind SEC-X-010.
 - Exposure-probe path list (SEC-X-001) compiled 2026-09 from common
   deployment-leak reports: .env, .git, backup/dump files, debug endpoints.
+- cloudflare/security-audit-skill (MIT, agent-agnostic, ~21.7k stars) —
+  referenced as the on-request deep-discovery delegation in
+  references/integrations.md; orthogonal to the gate (source-code
+  vulnerability hunting vs deployed-perimeter scanning) and never a
+  dependency. Install only from the official repo — popular security skills
+  attract typosquats.
